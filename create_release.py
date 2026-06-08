@@ -14,10 +14,83 @@ import os
 from datetime import datetime
 
 # ============ 配置区 ============
-ACCESS_TOKEN = "7ab29f15b5a3df3c0ff43c6c15471698"  # Gitee 私人令牌
-OWNER = "meow_paz"            # 仓库所有者
-REPO = "genshin-impact-data"  # 仓库名
-TARGET_BRANCH = "master"      # 目标分支
+# 尝试多个可能的配置文件路径
+CONFIG_PATHS = [
+    os.path.join(os.environ.get("APPDATA", ""), "gitee-release-cli-nodejs", "Config", "config.json"),
+    os.path.join(os.path.expanduser("~"), ".gitee-release-cli-config.json"),
+    os.path.join(os.path.expanduser("~"), ".gitee-release", "config.json"),
+    os.path.join(os.environ.get("USERPROFILE", ""), ".config", "gitee-release-cli", "config.json"),
+]
+
+ACCESS_TOKEN = None
+
+for CONFIG_PATH in CONFIG_PATHS:
+    if os.path.exists(CONFIG_PATH):
+        print(f"找到配置文件: {CONFIG_PATH}")
+        try:
+            with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+                config = json.load(f)
+                ACCESS_TOKEN = config.get("accessToken") or config.get("access_token") or config.get("token")
+                if ACCESS_TOKEN:
+                    print("成功从配置文件读取到 token")
+                    break
+        except Exception as e:
+            print(f"读取失败: {e}")
+
+# 如果没有，从环境变量读取
+if not ACCESS_TOKEN:
+    ACCESS_TOKEN = os.environ.get("GITEE_ACCESS_TOKEN")
+    if ACCESS_TOKEN:
+        print("从环境变量读取到 token")
+
+if not ACCESS_TOKEN:
+    print()
+    print("未找到配置文件，尝试了以下路径:")
+    for p in CONFIG_PATHS:
+        print(f"  - {p}")
+    print()
+    print("请先运行: gitee-release config accessToken 你的令牌")
+    print("或者设置环境变量: setx GITEE_ACCESS_TOKEN 你的令牌")
+    sys.exit(1)
+
+# ============ 从 .git\config 读取仓库信息 ============
+def get_git_info():
+    """从 .git\config 读取仓库信息"""
+    git_config_path = os.path.join(os.getcwd(), ".git", "config")
+    if not os.path.exists(git_config_path):
+        return None, None, None
+    
+    owner = None
+    repo = None
+    branch = None
+    
+    with open(git_config_path, "r", encoding="utf-8") as f:
+        content = f.read()
+        
+        # 解析 remote origin URL: git@gitee.com:meow_paz/genshin-impact-data.git
+        import re
+        match = re.search(r'url\s*=\s*git@[^:]+:([^/]+)/([^/.]+)', content)
+        if match:
+            owner = match.group(1)
+            repo = match.group(2)
+        
+        # 解析当前分支
+        match = re.search(r'\[branch\s+"([^"]+)"\]', content)
+        if match:
+            branch = match.group(1)
+    
+    return owner, repo, branch
+
+OWNER, REPO, TARGET_BRANCH = get_git_info()
+
+if not OWNER or not REPO:
+    OWNER = input("请输入仓库所有者 (owner): ").strip()
+    REPO = input("请输入仓库名 (repo): ").strip()
+
+if not TARGET_BRANCH:
+    TARGET_BRANCH = input("请输入目标分支 (默认 master): ").strip() or "master"
+
+print(f"仓库: {OWNER}/{REPO}  分支: {TARGET_BRANCH}")
 # =================================
 
 print("=" * 50)
