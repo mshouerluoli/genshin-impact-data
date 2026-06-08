@@ -1,0 +1,17 @@
+{
+  "name": "genshin-impact-data",
+  "version": "1.0.0",
+  "description": "本项目包含《原神》游戏相关数据的JSON数据文件及配套处理程序。",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@gitee.com:meow_paz/genshin-impact-data.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs"
+}

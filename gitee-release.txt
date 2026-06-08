@@ -1,4 +1,5 @@
 npm install -g gitee-release-cli
+npm init -y 生成package.json
 node-v24.16.0-x64.rar https://maoerniang.lanzouu.com/iLk3p3rfklda
 gitee-release create --upload 创建发行版标签
 gitee-release config accessToken 私人令牌
