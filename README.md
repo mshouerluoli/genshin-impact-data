@@ -23,6 +23,9 @@
 | `genshin-db-main\src\data\ChineseSimplified\enemies` | 更新了敌人名称数据 | 1 |
 | `genshin-db-main\src\data\ChineseSimplified\characters` | 更新了角色名称数据 | 1 |
 | `genshin-db-main\src\data\ChineseSimplified\materials` | 更新了各类素材、矿石、食材、天赋书、元素印等 | 855 |
+| `genshin-db-main\src\data\ChineseSimplified\animals` | 更新了动物名称数据 | 2 |
+| `genshin-db-main\src\data\ChineseSimplified\tcgcharactercards` | 更新了七圣召唤角色卡牌数据 | 113 |
+| `genshin-db-main\src\data\ChineseSimplified\talents` | 更新了角色天赋数据 | 111 |
 
 ### 传送任务数据 (teleport_tasks.json)
 
