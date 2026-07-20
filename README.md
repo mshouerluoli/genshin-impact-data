@@ -16,6 +16,14 @@
 
 包含游戏中各类道具、武器、圣遗物等信息的数据集合。
 
+**数据来源更新记录：**
+
+| 数据来源目录 | 更新内容 | 更新数量 |
+|---|---|---|
+| `genshin-db-main\src\data\ChineseSimplified\enemies` | 更新了敌人名称数据 | 1 |
+| `genshin-db-main\src\data\ChineseSimplified\characters` | 更新了角色名称数据 | 1 |
+| `genshin-db-main\src\data\ChineseSimplified\materials` | 更新了各类素材、矿石、食材、天赋书、元素印等 | 855 |
+
 ### 传送任务数据 (teleport_tasks.json)
 
 包含游戏内传送点及相关任务数据。
