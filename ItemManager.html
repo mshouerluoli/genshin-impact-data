@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Item.json 管理器</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Microsoft YaHei", sans-serif;
+    background: #0d1526; color: #dbe4f5; min-height: 100vh; padding: 16px;
+  }
+  .top {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    background: #152238; border: 1px solid #2a3d66; border-radius: 10px;
+    padding: 12px 16px; margin-bottom: 12px;
+  }
+  .top h1 { font-size: 17px; font-weight: 600; }
+  .top .status { font-size: 12px; color: #8fa3c8; }
+  .top .status.ok { color: #5cb87a; }
+  .top .status.err { color: #e05c5c; }
+  .spacer { flex: 1; }
+  button {
+    border: 1px solid #2a3d66; background: #1c2b4a; color: #dbe4f5;
+    padding: 7px 14px; border-radius: 8px; font-size: 13px; cursor: pointer;
+  }
+  button:hover { border-color: #4fa3d9; }
+  button.gold { background: #d9a441; border-color: transparent; color: #fff; font-weight: 600; }
+  button.gold:hover { filter: brightness(1.1); }
+  button.red { color: #e05c5c; }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  .card {
+    background: #152238; border: 1px solid #2a3d66; border-radius: 10px; overflow: hidden;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th {
+    background: #1c2b4a; color: #8fa3c8; text-align: left; font-size: 12px;
+    padding: 9px 12px; border-bottom: 1px solid #2a3d66;
+  }
+  td { padding: 0; border-bottom: 1px solid #1e2f52; }
+  tr:nth-child(even) td { background: rgba(255,255,255,.02); }
+  .c-id, .c-name { padding: 7px 12px; cursor: text; }
+  .c-id { width: 180px; color: #4fa3d9; font-family: Consolas, monospace; }
+  .c-op { width: 70px; text-align: center; }
+  .c-op button { padding: 3px 9px; font-size: 12px; }
+  td.edit { padding: 3px 8px; }
+  td.edit input {
+    width: 100%; background: #0d1526; color: #dbe4f5; border: 1px solid #d9a441;
+    border-radius: 6px; padding: 5px 8px; font-size: 13px; outline: none;
+  }
+  .empty { padding: 40px; text-align: center; color: #8fa3c8; }
+  .toast {
+    position: fixed; top: 16px; left: 50%; transform: translateX(-50%) translateY(-60px);
+    background: #1c2b4a; border: 1px solid #d9a441; padding: 9px 20px; border-radius: 9px;
+    font-size: 14px; transition: transform .2s; z-index: 9; max-width: 80vw;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .toast.err { border-color: #e05c5c; color: #ffd7d7; }
+</style>
+</head>
+<body>
+
+<div class="top">
+  <h1>Item.json 管理器</h1>
+  <span class="status" id="status">加载中…</span>
+  <span class="spacer"></span>
+  <button id="btnReload" title="重新从 Item.json 读取">↻ 重新加载</button>
+  <button id="btnAdd">＋ 新增</button>
+  <button class="gold" id="btnSave">保存</button>
+</div>
+
+<div class="card">
+  <table>
+    <thead><tr><th>ID</th><th>名称</th><th>操作</th></tr></thead>
+    <tbody id="tbody"></tbody>
+  </table>
+  <div class="empty" id="emptyTip" style="display:none">暂无数据</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+let rows = [];          // [{id, name}]
+let dirty = false;
+const tbody = document.getElementById("tbody");
+const toastEl = document.getElementById("toast");
+const statusEl = document.getElementById("status");
+let toastTimer;
+
+function toast(msg, err) {
+  toastEl.textContent = msg;
+  toastEl.className = "toast show" + (err ? " err" : "");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove("show"), 2500);
+}
+
+function setStatus(txt, cls) {
+  statusEl.textContent = txt;
+  statusEl.className = "status" + (cls ? " " + cls : "");
+}
+
+function render() {
+  tbody.innerHTML = "";
+  document.getElementById("emptyTip").style.display = rows.length ? "none" : "";
+  for (const r of rows) {
+    const tr = document.createElement("tr");
+    const tdId = document.createElement("td");
+    tdId.className = "c-id";
+    tdId.textContent = r.id || "（空）";
+    tdId.title = "点击编辑";
+    tdId.onclick = () => editCell(tdId, r, "id");
+    const tdName = document.createElement("td");
+    tdName.className = "c-name";
+    tdName.textContent = r.name;
+    tdName.title = "点击编辑";
+    tdName.onclick = () => editCell(tdName, r, "name");
+    const tdOp = document.createElement("td");
+    tdOp.className = "c-op";
+    const del = document.createElement("button");
+    del.className = "red";
+    del.textContent = "删除";
+    del.onclick = () => removeRow(r);
+    tdOp.appendChild(del);
+    tr.append(tdId, tdName, tdOp);
+    tbody.appendChild(tr);
+  }
+}
+
+function editCell(td, row, field) {
+  if (td.querySelector("input")) return;
+  const old = row[field];
+  const inp = document.createElement("input");
+  inp.value = old;
+  td.classList.add("edit");
+  td.textContent = "";
+  td.appendChild(inp);
+  inp.focus();
+  inp.select();
+  let done = false;
+  const commit = () => {
+    if (done) return;
+    done = true;
+    const v = inp.value.trim();
+    if (v !== old) { row[field] = v; dirty = true; }
+    render();
+  };
+  inp.onkeydown = (e) => {
+    if (e.key === "Enter") commit();
+    if (e.key === "Escape") { done = true; render(); }
+  };
+  inp.onblur = commit;
+}
+
+function addRow() {
+  const r = { id: "", name: "" };
+  rows.unshift(r);
+  dirty = true;
+  render();
+  const firstId = tbody.querySelector(".c-id");
+  if (firstId) firstId.click();
+}
+
+function removeRow(r) {
+  if (!confirm(`删除这条？\nID: ${r.id || "(空)"}  名称: ${r.name}`)) return;
+  rows = rows.filter(x => x !== r);
+  dirty = true;
+  render();
+}
+
+/* ---------- 加载 ---------- */
+async function loadItems() {
+  try {
+    const res = await fetch("/api/items", { cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    rows = Object.entries(data).map(([id, name]) => ({ id, name }));
+    dirty = false;
+    setStatus(`已加载 ${rows.length} 条`, "ok");
+    render();
+  } catch (e) {
+    setStatus("加载失败：" + e.message + "（请确认已通过「打开管理器.bat」启动）", "err");
+  }
+}
+
+/* ---------- 保存: 直接写回 Item.json ---------- */
+async function save() {
+  for (const r of rows) {
+    if (!r.id.trim()) { toast("存在空 ID，无法保存", true); return; }
+  }
+  const seen = new Set();
+  for (const r of rows) {
+    if (seen.has(r.id)) { toast(`ID 重复：${r.id}`, true); return; }
+    seen.add(r.id);
+  }
+  const payload = {};
+  for (const r of rows) payload[r.id] = r.name;
+
+  const btn = document.getElementById("btnSave");
+  btn.disabled = true;
+  btn.textContent = "保存中…";
+  try {
+    const res = await fetch("/api/items", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error || ("HTTP " + res.status));
+    dirty = false;
+    toast(`✅ 已保存 ${result.count} 条到 Item.json（原文件已备份为 Item.json.bak）`);
+  } catch (e) {
+    toast("保存失败：" + e.message, true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "保存";
+  }
+}
+
+/* ---------- 入口 ---------- */
+document.getElementById("btnAdd").onclick = addRow;
+document.getElementById("btnSave").onclick = save;
+document.getElementById("btnReload").onclick = () => {
+  if (dirty && !confirm("有未保存的修改，重新加载将丢弃。继续？")) return;
+  loadItems();
+};
+window.addEventListener("beforeunload", (e) => {
+  if (dirty) { e.preventDefault(); e.returnValue = ""; }
+});
+loadItems();
+
+// 保活心跳: 页面开着时定期 ping, 服务不会因空闲退出; 关闭页面后服务约 5 分钟自动关闭
+setInterval(() => {
+  fetch("/api/ping", { cache: "no-store" }).catch(() => {});
+}, 30000);
+</script>
+</body>
+</html>
