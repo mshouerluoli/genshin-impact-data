@@ -1,3 +1,4 @@
 # This file is created for gitee-release-cli tool
 *.bak*
+__pycache__/
 Item.json
