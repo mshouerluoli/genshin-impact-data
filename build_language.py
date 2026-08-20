@@ -1,20 +1,18 @@
 # -*- coding: utf-8 -*-
-"""build_language.py — 从 Language.cpp 提取翻译表, 生成 Language.json + Language.json.enc.hex
+"""build_language.py — 加密 Language.json -> Language.json.enc.hex (同 Item 流程)
+数据源现在是 Language.json 明文本身 (翻译维护在 Gitee 数据仓库, 不再从 C++ 源码提取)
 加密算法与 encrypt_item.py / C++ encryptData_ 完全一致 (密钥 m_encryptionByte = 0x6E):
     v4 = key ^ ((key>>1)&8) ^ (2*((key ^ ((key>>1)&8)) & 8))
     out = v4 ^ byte ^ ((v4 & 0x10 ^ 0x6E) >> 1)
 异或自反: 同一函数加密两次还原; 输出无换行十六进制
 """
-import json
 import os
-import re
 
 KEY = 0x6E  # m_encryptionByte, 主人确认
 
-SRC_CPP = r'D:\Vsyuanma\genshin-impact-version\version\Language\Language.cpp'
 OUT_DIR = r'D:\Vsyuanma\genshin-impact-data'
-OUT_JSON = os.path.join(OUT_DIR, 'Language.json')
-OUT_HEX = OUT_JSON + '.enc.hex'
+SRC_JSON = os.path.join(OUT_DIR, 'Language.json')
+OUT_HEX = SRC_JSON + '.enc.hex'
 
 
 def compute_v4(key):
@@ -31,49 +29,17 @@ def encrypt_block(data: bytes, key: int) -> bytes:
     return bytes((b ^ v4 ^ mask) & 0xFF for b in data)
 
 
-def extract_translations(cpp_path: str):
-    """从 Language.cpp 提取 {(char*)u8"中文", "英文"} 翻译对, 保持源文件顺序"""
-    with open(cpp_path, 'rb') as f:
-        raw = f.read()
-    text = raw.decode('utf-8-sig')  # 源文件带 BOM
-    pattern = re.compile(r'\{\s*\(char\*\)u8"([^"]+)",\s*"([^"]+)"\s*\}')
-    pairs = pattern.findall(text)
-    return pairs
-
-
 def main():
-    if not os.path.exists(SRC_CPP):
-        print('找不到文件:', SRC_CPP)
+    if not os.path.exists(SRC_JSON):
+        print('找不到文件:', SRC_JSON)
+        print('请先创建 Language.json (格式: {"中文": "英文", ...})')
         input('按回车退出...')
         return
 
-    pairs = extract_translations(SRC_CPP)
-    print('提取翻译条目: %d' % len(pairs))
-
-    # 统计重复中文 key (C++ unordered_map 语义: 后者覆盖前者, JSON dict 同样)
-    seen = {}
-    dup = []
-    for zh, en in pairs:
-        if zh in seen:
-            dup.append((zh, seen[zh], en))
-        seen[zh] = en
-
-    if dup:
-        print('重复 key %d 个 (JSON 以最后一个为准, 与 C++ map 一致):' % len(dup))
-        for zh, old, new in dup:
-            print('  "%s": "%s" -> "%s"' % (zh, old, new))
-    else:
-        print('无重复 key')
-
-    # 写 Language.json (2 空格缩进, 与 Item.json 风格一致, CRLF 结尾)
-    with open(OUT_JSON, 'w', encoding='utf-8', newline='') as f:
-        f.write(json.dumps(seen, ensure_ascii=False, indent=2).replace('\n', '\r\n') + '\r\n')
-    print('JSON 生成 -> %s (%d 条)' % (OUT_JSON, len(seen)))
-
-    # 加密 -> hex
-    with open(OUT_JSON, 'rb') as f:
+    with open(SRC_JSON, 'rb') as f:
         data = f.read()
     out = encrypt_block(data, KEY)
+
     with open(OUT_HEX, 'w', encoding='utf-8', newline='') as f:
         f.write(out.hex())
     print('加密完成 -> %s' % OUT_HEX)
